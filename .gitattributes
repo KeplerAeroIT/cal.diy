@@ -2,3 +2,7 @@
 /.yarn/releases/*    binary
 /.yarn/plugins/**/*  binary
 /.pnp.*              binary linguist-generated
+
+# Shell scripts get COPYd into Linux Docker images and executed there directly (e.g.
+# scripts/start.sh, scripts/wait-for-it.sh) — CRLF line endings break them under /bin/sh.
+*.sh text eol=lf
