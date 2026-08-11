@@ -87,8 +87,12 @@ To make persistent changes to API documentation, use NestJS decorators (`@ApiQue
 
 ### Workflows vs Webhooks
 
-Workflows and webhooks are two completely separate features in Cal.diy with different implementations and file structures:
-- Workflow constants: `packages/features/ee/workflows/lib/constants.ts`
-- NOT in the webhooks directory
+Workflows (automated reminders) were fully removed from this fork — the Prisma schema has no `Workflow` model, and migration `20260319000000_drop_workflow_tables` dropped the tables. `packages/features/ee/workflows/` does not exist. Webhooks (`packages/features/webhooks/`) are a separate, still-present system — do not confuse the two or assume workflow code exists.
 
-When working on workflow triggers, do not reference or use webhook trigger implementations - they are distinct systems.
+### Login providers (NextAuth)
+
+Providers are wired up in `packages/features/auth/lib/next-auth-options.ts`: CAL credentials (email+password), email magic link, and optionally Google, Azure AD/Outlook, and generic OIDC (Authentik, Keycloak, etc. — config in `packages/features/auth/lib/oidc.ts`, enabled via `OIDC_LOGIN_ENABLED`). `SAML`/`saml-idp` handling in the sign-in callback is vestigial from upstream Cal.com — `packages/features/ee` doesn't exist in this fork, so SAML login isn't actually functional despite the `IdentityProvider.SAML` enum value and stale `.env.example` docs referencing it.
+
+New users are auto-provisioned on first OAuth/OIDC login (same as Google/Azure AD always did) — this bypasses `NEXT_PUBLIC_DISABLE_SIGNUP` entirely, since that flag only gates the credentials-based `/api/auth/signup` route. Access control for OAuth/OIDC sign-in must be enforced on the IdP side.
+
+**Turborepo env var gotcha**: any custom env var (like the `OIDC_*` ones) must be added to `globalEnv` in `turbo.json`, or Turborepo silently strips it before it reaches the actual `next start` process — the var will still show up via `docker exec <container> env` (which reflects the container's env, not what Turbo passes through to the task), making this easy to misdiagnose as a Docker/env_file problem when it's actually a Turbo allowlist problem.

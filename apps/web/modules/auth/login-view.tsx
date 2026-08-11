@@ -105,6 +105,8 @@ export default function Login({
   csrfToken,
   isGoogleLoginEnabled,
   isOutlookLoginEnabled,
+  isOidcLoginEnabled,
+  oidcProviderName,
   totpEmail,
 }: PageProps) {
   const searchParams = useCompatSearchParams();
@@ -170,7 +172,7 @@ export default function Login({
     else setErrorMessage(errorMessages[res.error] || t("something_went_wrong"));
   };
 
-  const showSocialLogin = isGoogleLoginEnabled || isOutlookLoginEnabled;
+  const showSocialLogin = isGoogleLoginEnabled || isOutlookLoginEnabled || isOidcLoginEnabled;
   const showSignupLink =
     process.env.NEXT_PUBLIC_DISABLE_SIGNUP !== "true" && searchParams?.get("register") !== "false";
 
@@ -228,6 +230,23 @@ export default function Login({
                       <MicrosoftIcon />
                       <span>{t("signin_with_microsoft")}</span>
                       {lastUsed === "microsoft" && <LastUsed />}
+                    </Button>
+                  )}
+                  {isOidcLoginEnabled && (
+                    <Button
+                      variant="outline"
+                      className="w-full py-1"
+                      data-testid="oidc"
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        setLastUsed("oidc");
+                        await signIn("oidc", {
+                          callbackUrl,
+                        });
+                      }}>
+                      <Icon name="lock" className="size-4" />
+                      <span>Sign in with {oidcProviderName}</span>
+                      {lastUsed === "oidc" && <LastUsed />}
                     </Button>
                   )}
                 </div>

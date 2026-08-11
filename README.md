@@ -705,6 +705,22 @@ following
 5. Use **Application (client) ID** as the **MS_GRAPH_CLIENT_ID** attribute value in .env
 6. Click **Certificates & secrets** create a new client secret and use the value as the **MS_GRAPH_CLIENT_SECRET** attribute
 
+### Setting up generic OIDC login (Authentik, Keycloak, etc.)
+
+Cal.diy supports signing in through any OpenID Connect provider — Authentik, Keycloak, or any other OIDC-compliant IdP.
+
+1. In your IdP, create an OAuth2/OIDC application/provider with redirect URI `<Cal.diy URL>/api/auth/callback/oidc` (e.g. `http://localhost:3000/api/auth/callback/oidc`).
+2. Request at least the `openid`, `email`, and `profile` scopes.
+3. Make sure the provider returns an `email_verified: true` claim and a non-empty `name` (or `preferred_username`) claim via its userinfo endpoint — Cal.diy rejects sign-in if the email isn't verified, and falls back through `name` → `preferred_username` → `email` when creating a new user, but still needs at least one of them non-empty. For Authentik specifically, add an `email_verified` claim to your provider's scope mapping if it isn't already there, and give each user a display name.
+4. Set these in `.env`:
+   - `OIDC_LOGIN_ENABLED=true`
+   - `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` from your IdP
+   - `OIDC_ISSUER` — the provider's base URL, without `/.well-known/openid-configuration` (e.g. for Authentik: `https://authentik.example.com/application/o/<app-slug>/`)
+   - `OIDC_PROVIDER_NAME` — label shown on the login button (defaults to "SSO")
+5. **If you add any new custom env var beyond what's already in `.env.example`**, also add it to `globalEnv` in `turbo.json` — Turborepo strips any env var not declared there before it reaches the app process, even though it's present in the container's environment.
+
+A user signing in via OIDC for the first time is auto-provisioned (same as Google/Azure AD) — there's no separate invite step, and this happens regardless of `NEXT_PUBLIC_DISABLE_SIGNUP`. Access control for who can sign in should be enforced on the IdP side (e.g. restrict which users/groups can access the OIDC application in Authentik).
+
 ### Obtaining Zoom Client ID and Secret
 
 1. Open [Zoom Marketplace](https://marketplace.zoom.us/) and sign in with your Zoom account.

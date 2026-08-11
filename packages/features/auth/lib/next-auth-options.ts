@@ -4,6 +4,13 @@ import { updateProfilePhotoMicrosoft } from "@calcom/app-store/_utils/oauth/upda
 import { createGoogleCalendarServiceWithGoogleType } from "@calcom/app-store/googlecalendar/lib/CalendarService";
 import { getIdentityProvider } from "@calcom/features/auth/lib/identityProviders";
 import {
+  IS_OIDC_LOGIN_ENABLED,
+  OIDC_CLIENT_ID,
+  OIDC_CLIENT_SECRET,
+  OIDC_ISSUER,
+  OIDC_PROVIDER_NAME,
+} from "@calcom/features/auth/lib/oidc";
+import {
   OUTLOOK_CLIENT_ID,
   OUTLOOK_CLIENT_SECRET,
   OUTLOOK_LOGIN_ENABLED,
@@ -354,6 +361,32 @@ if (OUTLOOK_LOGIN_ENABLED && OUTLOOK_CLIENT_ID && OUTLOOK_CLIENT_SECRET) {
       },
     })
   );
+}
+
+if (IS_OIDC_LOGIN_ENABLED) {
+  providers.push({
+    id: "oidc",
+    name: OIDC_PROVIDER_NAME,
+    type: "oauth",
+    wellKnown: `${OIDC_ISSUER}/.well-known/openid-configuration`,
+    clientId: OIDC_CLIENT_ID,
+    clientSecret: OIDC_CLIENT_SECRET,
+    allowDangerousEmailAccountLinking: true,
+    // Don't rely on the ID token for claims — Authentik (and many OIDC providers) omit
+    // email_verified there and only include it via the userinfo endpoint.
+    checks: ["pkce", "state"],
+    authorization: { params: { scope: "openid email profile" } },
+    profile(profile) {
+      return {
+        id: profile.sub,
+        // Use || (not ??) — Authentik returns name: "" (empty string, not null/undefined)
+        // for accounts without a display name set, which nullish coalescing wouldn't catch.
+        name: profile.name || profile.preferred_username || profile.email,
+        email: profile.email,
+        image: profile.picture ?? null,
+      };
+    },
+  } as Provider);
 }
 
 providers.push(
@@ -864,7 +897,7 @@ export const getOptions = ({
         }
 
         if (!isEmailVerified && idP !== IdentityProvider.AZUREAD) {
-          log.error("Attention: SAML/Google User email is not verified in the IdP", safeStringify({ user }));
+          log.error("Attention: SAML/Google/OIDC User email is not verified in the IdP", safeStringify({ user }));
           return "/auth/error?error=unverified-email";
         }
 
@@ -1027,12 +1060,13 @@ export const getOptions = ({
             }
           }
 
-          // User signs up with email/password and then tries to login with Google/SAML/AzureAD using the same email
+          // User signs up with email/password and then tries to login with Google/SAML/AzureAD/OIDC using the same email
           if (
             existingUserWithEmail.identityProvider === IdentityProvider.CAL &&
             (idP === IdentityProvider.GOOGLE ||
               idP === IdentityProvider.SAML ||
-              idP === IdentityProvider.AZUREAD)
+              idP === IdentityProvider.AZUREAD ||
+              idP === IdentityProvider.OIDC)
           ) {
             // Prevent account pre-hijacking: block OAuth linking for unverified accounts
             if (!existingUserWithEmail.emailVerified) {
